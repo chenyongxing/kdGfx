@@ -1,0 +1,10 @@
+#pragma once
+
+#include <vulkan/vulkan_core.h>
+
+extern PFN_vkCreateDebugUtilsMessengerEXT vkCreateDebugUtilsMessengerKD;
+extern PFN_vkDestroyDebugUtilsMessengerEXT vkDestroyDebugUtilsMessengerKD;
+extern PFN_vkGetDeviceProcAddr vkGetDeviceProcAddrKD;
+extern PFN_vkSetDebugUtilsObjectNameEXT vkSetDebugUtilsObjectNameKD;
+extern PFN_vkCmdBeginDebugUtilsLabelEXT vkCmdBeginDebugUtilsLabelKD;
+extern PFN_vkCmdEndDebugUtilsLabelEXT vkCmdEndDebugUtilsLabelKD;

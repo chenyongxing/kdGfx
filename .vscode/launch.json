@@ -1,0 +1,40 @@
+{
+    "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "BlurDualKawase",
+      "type": "gdb",
+      "request": "launch",
+      "target": "${workspaceRoot}/build/Examples/2D/BlurDualKawase/BlurDualKawase",
+      "cwd": "${workspaceRoot}/build/Examples/2D/BlurDualKawase"
+    },
+    {
+      "name": "GenieEffect",
+      "type": "gdb",
+      "request": "launch",
+      "target": "${workspaceRoot}/build/Examples/2D/GenieEffect/GenieEffect",
+      "cwd": "${workspaceRoot}/build/Examples/2D/GenieEffect"
+    },
+    {
+      "name": "ImageZoomFilter",
+      "type": "gdb",
+      "request": "launch",
+      "target": "${workspaceRoot}/build/Examples/2D/ImageZoomFilter/ImageZoomFilter",
+      "cwd": "${workspaceRoot}/build/Examples/2D/ImageZoomFilter"
+    },
+    {
+      "name": "TouchEffect",
+      "type": "gdb",
+      "request": "launch",
+      "target": "${workspaceRoot}/build/Examples/2D/TouchEffect/TouchEffect",
+      "cwd": "${workspaceRoot}/build/Examples/2D/TouchEffect"
+    },
+    {
+      "name": "WindowDecoration",
+      "type": "gdb",
+      "request": "launch",
+      "target": "${workspaceRoot}/build/Examples/2D/WindowDecoration/WindowDecoration",
+      "cwd": "${workspaceRoot}/build/Examples/2D/WindowDecoration"
+    }
+  ]
+}

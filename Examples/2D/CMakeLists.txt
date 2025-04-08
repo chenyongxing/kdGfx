@@ -1,0 +1,5 @@
+add_subdirectory(BlurDualKawase)
+add_subdirectory(GenieEffect)
+add_subdirectory(ImageZoomFilter)
+add_subdirectory(TouchEffect)
+add_subdirectory(WindowDecoration)
