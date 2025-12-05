@@ -37,6 +37,7 @@ namespace kdGfx
         void dispatch(uint32_t groupCountX, uint32_t groupCountY, uint32_t groupCountZ) override;
 		void copyBuffer(const std::shared_ptr<Buffer>& src, const std::shared_ptr<Buffer>& dst, size_t size) override;
         void copyBufferToTexture(const std::shared_ptr<Buffer>& buffer, const std::shared_ptr<Texture>& texture, uint32_t mipLevel) override;
+        void copyTextureToBuffer(const std::shared_ptr<Texture>& texture, const std::shared_ptr<Buffer>& buffer,uint32_t mipLevel) override;
         void copyTexture(const std::shared_ptr<Texture>& src, const std::shared_ptr<Texture>& dst,
             glm::uvec2 size, glm::ivec2 srcOffset, glm::ivec2 dstOffset) override;
         void resolveTexture(const std::shared_ptr<Texture>& src, const std::shared_ptr<Texture>& dst) override;

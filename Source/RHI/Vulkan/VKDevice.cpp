@@ -336,6 +336,38 @@ namespace kdGfx
 		return mapping[format];
 	}
 
+	VkImageUsageFlags VKDevice::toVkImageUsage(TextureUsage usage) const
+	{
+		VkImageUsageFlags vkUsage = 0;
+
+		if (usage & TextureUsage::CopyDst || usage & TextureUsage::ResolveDst)
+		{
+			vkUsage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+		}
+		if (usage & TextureUsage::CopySrc || usage & TextureUsage::ResolveSrc)
+		{
+			vkUsage |= VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
+		}
+		if (usage & TextureUsage::Sampled)
+		{
+			vkUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+		}
+		if (usage & TextureUsage::Storage)
+		{
+			vkUsage |= VK_IMAGE_USAGE_STORAGE_BIT;
+		}
+		if (usage & TextureUsage::ColorAttachment)
+		{
+			vkUsage |= VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		}
+		if (usage & TextureUsage::DepthStencilAttachment)
+		{
+			vkUsage |= VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		}
+
+		return vkUsage;
+	}
+
 	VkImageLayout VKDevice::toVkImageLayout(TextureState state) const
 	{
 		static std::unordered_map<TextureState, VkImageLayout> mapping =

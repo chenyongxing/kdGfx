@@ -47,7 +47,7 @@ namespace kdGfx
 
 		if (desc.usage & BufferUsage::Constant)
 		{
-			_desc.hostVisible = true;
+			_desc.hostVisible = HostVisible::Upload;
 		}
 
 		VkBufferCreateInfo bufferCreateInfo =
@@ -62,7 +62,7 @@ namespace kdGfx
 		}
 
 		VkMemoryPropertyFlags properties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		if (_desc.hostVisible)
+		if (_desc.hostVisible != HostVisible::Invisible)
 		{
 			properties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
 				VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_CACHED_BIT;
@@ -101,7 +101,7 @@ namespace kdGfx
 
 		if (desc.usage & BufferUsage::Constant)
 		{
-			_desc.hostVisible = true;
+			_desc.hostVisible = HostVisible::Upload;
 		}
 
 		VkBufferCreateInfo bufferCreateInfo =
@@ -142,7 +142,7 @@ namespace kdGfx
 
 	void* VKBuffer::map()
 	{
-		if (_mappedPtr == nullptr && _desc.hostVisible)
+		if (_mappedPtr == nullptr && (_desc.hostVisible != HostVisible::Invisible))
 		{
 			vkMapMemory(_device.getDevice(), _bufferMemory, 0, _desc.size, 0, &_mappedPtr);
 		}
@@ -151,7 +151,7 @@ namespace kdGfx
 
 	void VKBuffer::unmap()
 	{
-		if (_mappedPtr && _desc.hostVisible)
+		if (_mappedPtr && (_desc.hostVisible != HostVisible::Invisible))
 		{
 			vkUnmapMemory(_device.getDevice(), _bufferMemory);
 			_mappedPtr = nullptr;

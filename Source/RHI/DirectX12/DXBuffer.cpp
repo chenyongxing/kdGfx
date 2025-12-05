@@ -13,8 +13,18 @@ namespace kdGfx
     {
         _desc = desc;
 
-        D3D12_HEAP_PROPERTIES heapProperties = _desc.hostVisible ? 
-            CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD) : CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        D3D12_HEAP_PROPERTIES heapProperties;
+        switch (_desc.hostVisible) {
+            case HostVisible::Upload:
+                heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+                break;
+			case HostVisible::Readback: 
+                heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+                break;
+            default:
+				heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+			    break;
+        }
         
         D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
         if (HasAnyBits(desc.usage, BufferUsage::Storage))
@@ -36,8 +46,18 @@ namespace kdGfx
     {
         _desc = desc;
 
-        D3D12_HEAP_PROPERTIES heapProperties = _desc.hostVisible ?
-            CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD) : CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+        D3D12_HEAP_PROPERTIES heapProperties;
+        switch (_desc.hostVisible) {
+        case HostVisible::Upload:
+            heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+            break;
+        case HostVisible::Readback:
+            heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
+            break;
+        default:
+            heapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+            break;
+        }
 
         D3D12_RESOURCE_FLAGS flags = D3D12_RESOURCE_FLAG_NONE;
         if (HasAnyBits(desc.usage, BufferUsage::Storage))
@@ -59,7 +79,7 @@ namespace kdGfx
 
     void* DXBuffer::map()
     {
-        if (_mappedPtr == nullptr && _desc.hostVisible)
+        if (_mappedPtr == nullptr && (_desc.hostVisible != HostVisible::Invisible))
         {
             CD3DX12_RANGE readRange(0, 0);
             _resource->Map(0, &readRange, &_mappedPtr);
@@ -69,7 +89,7 @@ namespace kdGfx
 
     void DXBuffer::unmap()
     {
-        if (_mappedPtr && _desc.hostVisible)
+        if (_mappedPtr && (_desc.hostVisible != HostVisible::Invisible))
         {
             CD3DX12_RANGE writtenRange(0, _desc.size);
             _resource->Unmap(0, &writtenRange);

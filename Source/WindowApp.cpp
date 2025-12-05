@@ -66,7 +66,8 @@ namespace kdGfx
 
 		_fence = _device->createFence(_fenceValue);
 		
-		StagingBuffer::initGlobal(_desc.backend, _device);
+		StagingBuffer::initUploadGlobal(_desc.backend, _device);
+		StagingBuffer::initReadbackGlobal(_desc.backend, _device);
 		ImageProcessor::initSingleton(_desc.backend, _device);
 		MipMapsGen::initSingleton(_desc.backend, _device);
 
@@ -148,7 +149,8 @@ namespace kdGfx
 		_destroyImGui();
 		ImageProcessor::destroySingleton();
 		MipMapsGen::destroySingleton();
-		StagingBuffer::destroyGlobal();
+		StagingBuffer::destroyReadbackGlobal();
+		StagingBuffer::destroyUploadGlobal();
 	}
 
 	bool WindowApp::mouseButtonPress(int button)
@@ -181,7 +183,7 @@ namespace kdGfx
 			.height = (uint32_t)imageHeight,
 			.name = file.c_str()
 		});
-		StagingBuffer::getGlobal().uploadTexture(texture, imageData, imageWidth * imageHeight * 4);
+		StagingBuffer::getUploadGlobal().uploadTexture(texture, imageData, imageWidth * imageHeight * 4);
 
 		return std::make_tuple(texture, texture->createView({}));
 	}
@@ -213,6 +215,11 @@ namespace kdGfx
 	{
 	}
 
+	void WindowApp::setWindowSize(uint32_t width, uint32_t height)
+	{
+		glfwSetWindowSize(gWindow, width, height);
+	}
+
 	glm::vec2 WindowApp::getCursorPos()
 	{
 		double x, y;
@@ -238,6 +245,7 @@ namespace kdGfx
 #endif
 #endif
 			.format = _desc.format,
+			.usage = _desc.usage,
 			.width = _desc.width,
 			.height = _desc.height,
 			.frameCount = _frameCount,

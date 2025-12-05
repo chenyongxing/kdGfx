@@ -391,6 +391,7 @@ namespace kdGfx
 		D3D12_TEXTURE_COPY_LOCATION dstLocation = {};
 		dstLocation.pResource = dxTexture->getResource().Get();
 		dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		dstLocation.SubresourceIndex = mipLevel;
 
 		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
 		footprint.Offset = 0; 
@@ -404,6 +405,32 @@ namespace kdGfx
 		srcLocation.pResource = dxBuffer->getResource().Get();
 		srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
 		srcLocation.PlacedFootprint = footprint;
+
+		_commandList4->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
+	}
+
+	void DXCommandList::copyTextureToBuffer(const std::shared_ptr<Texture>& texture, const std::shared_ptr<Buffer>& buffer, uint32_t mipLevel)
+	{
+		auto dxBuffer = std::dynamic_pointer_cast<DXBuffer>(buffer);
+		auto dxTexture = std::dynamic_pointer_cast<DXTexture>(texture);
+
+		D3D12_TEXTURE_COPY_LOCATION srcLocation = {};
+		srcLocation.pResource = dxTexture->getResource().Get();
+		srcLocation.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
+		srcLocation.SubresourceIndex = mipLevel;
+
+		D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint = {};
+		footprint.Offset = 0;
+		footprint.Footprint.Format = dxTexture->getDxgiFormat();
+		footprint.Footprint.Width = texture->getWidth();
+		footprint.Footprint.Height = texture->getHeight();
+		footprint.Footprint.Depth = 1;
+		footprint.Footprint.RowPitch = texture->getWidth() * GetBytesPerPixel(dxTexture->getFormat());
+
+		D3D12_TEXTURE_COPY_LOCATION dstLocation = {};
+		dstLocation.pResource = dxBuffer->getResource().Get();
+		dstLocation.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
+		dstLocation.PlacedFootprint = footprint;
 
 		_commandList4->CopyTextureRegion(&dstLocation, 0, 0, 0, &srcLocation, nullptr);
 	}

@@ -391,14 +391,14 @@ namespace kdGfx
 		verticesBufferDesc.usage = BufferUsage::Vertex | BufferUsage::Storage | BufferUsage::CopyDst;
 		verticesBufferDesc.name = "Vertices";
 		verticesBuffer = _device->createBuffer(verticesBufferDesc);
-		StagingBuffer::getGlobal().uploadBuffer(verticesBuffer, mergedVertices.data(), verticesBufferDesc.size);
+		StagingBuffer::getUploadGlobal().uploadBuffer(verticesBuffer, mergedVertices.data(), verticesBufferDesc.size);
 
 		BufferDesc indicesBufferDesc;
 		indicesBufferDesc.size = sizeof(uint32_t) * mergedIndices.size();
 		indicesBufferDesc.usage = BufferUsage::Index | BufferUsage::Storage | BufferUsage::CopyDst;
 		indicesBufferDesc.name = "Indices";
 		indicesBuffer = _device->createBuffer(indicesBufferDesc);
-		StagingBuffer::getGlobal().uploadBuffer(indicesBuffer, mergedIndices.data(), indicesBufferDesc.size);
+		StagingBuffer::getUploadGlobal().uploadBuffer(indicesBuffer, mergedIndices.data(), indicesBufferDesc.size);
 	}
 
 	void Scene::_uploadImages()
@@ -417,7 +417,7 @@ namespace kdGfx
 			desc.mipLevels = image->genMipmap ? fitMipLevel : 1;
 			image->texture = _device->createTexture(desc);
 			image->textureView = image->texture->createView({ .levelCount = desc.mipLevels });
-			StagingBuffer::getGlobal().uploadTexture(image->texture, image->data.data(), image->data.size());
+			StagingBuffer::getUploadGlobal().uploadTexture(image->texture, image->data.data(), image->data.size());
 			if (image->isSrgb)	ImageProcessor::singleton().process({ .gamma = 2.2f }, image->texture, 0);
 			if (image->genMipmap) MipMapsGen::singleton().generate(image->texture);
 			image->data.clear();
@@ -447,7 +447,7 @@ namespace kdGfx
 		desc.usage = BufferUsage::Storage | BufferUsage::CopyDst;
 		desc.name = "Materials";
 		materialsBuffer = _device->createBuffer(desc);
-		StagingBuffer::getGlobal().uploadBuffer(materialsBuffer, materialGPUs.data(), materialsBuffer->getSize());
+		StagingBuffer::getUploadGlobal().uploadBuffer(materialsBuffer, materialGPUs.data(), materialsBuffer->getSize());
 
 		for (auto& material : materials)	material->dirty = false;
 	}
@@ -505,7 +505,7 @@ namespace kdGfx
 			desc.usage = BufferUsage::Storage | BufferUsage::CopyDst;
 			desc.name = "Scene-Instances";
 			instancesBuffer = _device->createBuffer(desc);
-			StagingBuffer::getGlobal().uploadBuffer(instancesBuffer, instances.data(), instancesBuffer->getSize());
+			StagingBuffer::getUploadGlobal().uploadBuffer(instancesBuffer, instances.data(), instancesBuffer->getSize());
 		}
 
 		lightsBuffer.reset();
@@ -517,7 +517,7 @@ namespace kdGfx
 			desc.usage = BufferUsage::Storage | BufferUsage::CopyDst;
 			desc.name = "Scene-Lights";
 			lightsBuffer = _device->createBuffer(desc);
-			StagingBuffer::getGlobal().uploadBuffer(lightsBuffer, lights.data(), lightsBuffer->getSize());
+			StagingBuffer::getUploadGlobal().uploadBuffer(lightsBuffer, lights.data(), lightsBuffer->getSize());
 		}
 
 		drawCommandsBuffer.reset();
@@ -529,7 +529,7 @@ namespace kdGfx
 			desc.usage = BufferUsage::Storage | BufferUsage::Indirect | BufferUsage::CopyDst;
 			desc.name = "Scene-DrawCommands";
 			drawCommandsBuffer = _device->createBuffer(desc);
-			StagingBuffer::getGlobal().uploadBuffer(drawCommandsBuffer, drawCommands.data(), drawCommandsBuffer->getSize());
+			StagingBuffer::getUploadGlobal().uploadBuffer(drawCommandsBuffer, drawCommands.data(), drawCommandsBuffer->getSize());
 		}
 		drawCommandCount = drawCommands.size();
 	}

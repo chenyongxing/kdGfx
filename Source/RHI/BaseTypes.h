@@ -67,13 +67,20 @@ namespace kdGfx
     };
     ENUM_BITWISE_OPERATOR(BufferUsage)
 
+	enum struct HostVisible
+    {
+        Invisible,
+        Upload,
+        Readback
+    };
+
     struct BufferDesc
     {
         size_t size = 0;
         // indirectDraw commandBuffer stride + directX12 StructuredBuffer stride
         uint32_t stride = 0;
         BufferUsage usage = BufferUsage::Undefined;
-        bool hostVisible = false;
+        HostVisible hostVisible = HostVisible::Invisible;
         std::string name;
     };
 
@@ -177,6 +184,7 @@ namespace kdGfx
     {
         void* window = nullptr;
         Format format = Format::Undefined;
+		TextureUsage usage = TextureUsage::ColorAttachment;
         uint32_t width = 0;
         uint32_t height = 0;
         uint32_t frameCount = 2;

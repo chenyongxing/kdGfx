@@ -44,7 +44,8 @@ namespace kdGfx
             .Height = _desc.height,
             .Format = requestFormat,
             .SampleDesc = { 1, 0 },
-            .BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT,
+            .BufferUsage = (_desc.usage & TextureUsage::Sampled) ? 
+                DXGI_USAGE_RENDER_TARGET_OUTPUT | DXGI_USAGE_SHADER_INPUT : DXGI_USAGE_RENDER_TARGET_OUTPUT,
             .BufferCount = _desc.frameCount,
             .SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD,
             .AlphaMode = DXGI_ALPHA_MODE_IGNORE,
@@ -74,7 +75,7 @@ namespace kdGfx
             _swapChain->GetBuffer(i, IID_PPV_ARGS(&resource));
             TextureDesc textureDesc =
             {
-                .usage = TextureUsage::ColorAttachment | TextureUsage::CopySrc | TextureUsage::CopyDst,
+                .usage = _desc.usage,
                 .format = _desc.format,
                 .width = _desc.width,
                 .height = _desc.height,

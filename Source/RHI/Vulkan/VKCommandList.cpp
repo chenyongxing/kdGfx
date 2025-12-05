@@ -378,6 +378,22 @@ namespace kdGfx
 		vkCmdCopyBufferToImage(_commandBuffer, vkBuffer->getBuffer(), vkTexture->getImage(),
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copyRegion);
 	}
+	
+	void VKCommandList::copyTextureToBuffer(const std::shared_ptr<Texture>& texture, const std::shared_ptr<Buffer>& buffer, uint32_t mipLevel)
+	{
+		auto vkBuffer = std::dynamic_pointer_cast<VKBuffer>(buffer);
+		auto vkTexture = std::dynamic_pointer_cast<VKTexture>(texture);
+
+		VkBufferImageCopy copyRegion =
+		{
+			.imageSubresource = { VK_IMAGE_ASPECT_COLOR_BIT, mipLevel, 0, 1 },
+			.imageOffset = { 0, 0, 0 },
+			.imageExtent = { texture->getWidth(), texture->getHeight(), 1 }
+		};
+		vkCmdCopyImageToBuffer(_commandBuffer,
+			vkTexture->getImage(), VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			vkBuffer->getBuffer(), 1, &copyRegion);
+	}
 
 	void VKCommandList::copyTexture(const std::shared_ptr<Texture>& src, const std::shared_ptr<Texture>& dst,
 		glm::uvec2 size, glm::ivec2 srcOffset, glm::ivec2 dstOffset)

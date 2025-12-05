@@ -39,7 +39,7 @@ namespace kdGfx
 			.imageColorSpace = _surfaceFormat.colorSpace,
 			.imageExtent = VkExtent2D{desc.width, desc.height},
 			.imageArrayLayers = 1,
-			.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+			.imageUsage = device.toVkImageUsage(desc.usage),
 			.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE,
 			.preTransform = VK_SURFACE_TRANSFORM_IDENTITY_BIT_KHR,
 			.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR,
@@ -61,7 +61,7 @@ namespace kdGfx
 		{
 			TextureDesc textureDesc =
 			{
-				.usage = TextureUsage::ColorAttachment | TextureUsage::CopySrc | TextureUsage::CopyDst,
+				.usage = desc.usage,
 				.format = _desc.format,
 				.width = _desc.width,
 				.height = _desc.height,

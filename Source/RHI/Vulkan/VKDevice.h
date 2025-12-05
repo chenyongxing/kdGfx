@@ -34,6 +34,7 @@ namespace kdGfx
         uint32_t getMaxDescriptorCount(BindEntryType type);
         Format fromVkFormat(VkFormat format) const;
         VkFormat toVkFormat(Format format) const;
+        VkImageUsageFlags toVkImageUsage(TextureUsage usage) const;
         VkImageLayout toVkImageLayout(TextureState state) const;
         VkDescriptorType toVkDescriptorType(BindEntryType type) const;
         VkShaderStageFlags toVkShaderStageFlags(ShaderType type) const;

@@ -55,6 +55,9 @@ namespace kdGfx
         virtual void copyBufferToTexture(const std::shared_ptr<Buffer>& buffer,
                                          const std::shared_ptr<Texture>& texture,
                                          uint32_t mipLevel = 0) = 0;
+        virtual void copyTextureToBuffer(const std::shared_ptr<Texture>& texture,
+                                         const std::shared_ptr<Buffer>& buffer,
+                                         uint32_t mipLevel = 0) = 0;
         virtual void copyTexture(const std::shared_ptr<Texture>& src,
                                  const std::shared_ptr<Texture>& dst,
                                  glm::uvec2 size,

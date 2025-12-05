@@ -1191,7 +1191,7 @@ namespace kdGfx
 			({
 				.size = MemAlign(vertexBufferSize * sizeof(ImDrawVert), 4),
 				.usage = BufferUsage::Vertex,
-				.hostVisible = true,
+				.hostVisible = HostVisible::Upload,
 				.name = "imGuiVertex"
 			});
 		}
@@ -1203,7 +1203,7 @@ namespace kdGfx
 			({
 				.size = MemAlign(indexBufferSize * sizeof(ImDrawIdx), 4),
 				.usage = BufferUsage::Index,
-				.hostVisible = true,
+				.hostVisible = HostVisible::Upload,
 				.name = "imGuiIndex"
 			});
 		}
@@ -1349,7 +1349,7 @@ namespace kdGfx
 		({
 			.size = MemAlign(sizeof(Uniforms), 16),
 			.usage = BufferUsage::Constant,
-			.hostVisible = true,
+			.hostVisible = HostVisible::Upload,
 			.name = "imGuiUniforms"
 		});
 		_createFontsTexture();
@@ -1393,7 +1393,7 @@ namespace kdGfx
 			.height = (uint32_t)height,
 			.name = "imGuiFont"
 		});
-		StagingBuffer::getGlobal().uploadTexture(data->renderResources->fontTexture, pixels, width * height * 4);
+		StagingBuffer::getUploadGlobal().uploadTexture(data->renderResources->fontTexture, pixels, width * height * 4);
 
 		data->renderResources->fontTextureView = data->renderResources->fontTexture->createView({});
 

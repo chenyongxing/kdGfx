@@ -2,13 +2,14 @@
 
 namespace kdGfx
 {
-	StagingBuffer::StagingBuffer(BackendType backend, const std::shared_ptr<Device>& device) :
+	StagingBuffer::StagingBuffer(HostVisible hostVisible, BackendType backend, const std::shared_ptr<Device>& device) :
+		_hostVisible(hostVisible),
 		_backend(backend),
 		_device(device)
 	{
 	}
 
-	void StagingBuffer::uploadBuffer(std::shared_ptr<Buffer> buffer, void* data, size_t size)
+	void StagingBuffer::uploadBuffer(std::shared_ptr<Buffer> buffer, const void* data, size_t size)
 	{
 		resize(size);
 		memcpy(_buffer->map(), data, size);
@@ -22,14 +23,14 @@ namespace kdGfx
 		copyQueue->waitIdle();
 	}
 
-	void StagingBuffer::uploadTexture(std::shared_ptr<Texture> texture, void* data, size_t size)
+	void StagingBuffer::uploadTexture(std::shared_ptr<Texture> texture, const void* data, size_t size)
 	{
 		resize(size);
 		memcpy(_buffer->map(), data, size);
 
 		if (_backend == BackendType::DirectX12)
 		{
-			// dx12复制队列复制需要状态General
+			// dx12复制队列复制需要General状态
 			auto commandList = _device->createCommandList(CommandListType::Copy);
 			commandList->begin();
 			commandList->copyBufferToTexture(_buffer, texture);
@@ -65,6 +66,52 @@ namespace kdGfx
 		}
 	}
 
+	void StagingBuffer::readbackTexture(std::shared_ptr<Texture> texture, void* data, size_t size)
+	{
+		assert(_device && _hostVisible == HostVisible::Readback);
+
+		resize(size);
+
+		if (_backend == BackendType::DirectX12)
+		{
+			// dx12复制队列复制需要General状态
+			auto commandList = _device->createCommandList(CommandListType::Copy);
+			commandList->begin();
+			commandList->copyTextureToBuffer(texture, _buffer);
+			commandList->end();
+			auto copyQueue = _device->getCommandQueue(CommandListType::Copy);
+			copyQueue->submit({ commandList });
+			copyQueue->waitIdle();
+		}
+		else if (_backend == BackendType::Vulkan)
+		{
+			auto textureState = texture->getState();
+			auto commandList = _device->createCommandList(CommandListType::General);
+			commandList->begin();
+			commandList->resourceBarrier
+			({
+				.texture = texture,
+				.oldState = textureState,
+				.newState = TextureState::CopySrc,
+				.subRange = { 0, texture->getDesc().mipLevels, 0, 1}
+				});
+			commandList->copyTextureToBuffer(texture, _buffer);
+			commandList->resourceBarrier
+			({
+				.texture = texture,
+				.oldState = TextureState::CopySrc,
+				.newState = textureState,
+				.subRange = { 0, texture->getDesc().mipLevels, 0, 1}
+				});
+			commandList->end();
+			auto copyQueue = _device->getCommandQueue(CommandListType::General);
+			copyQueue->submit({ commandList });
+			copyQueue->waitIdle();
+		}
+
+		memcpy(data, _buffer->map(), size);
+	}
+
 	bool StagingBuffer::resize(size_t size)
 	{
 		if (_buffer == nullptr || _buffer->getSize() < size)
@@ -72,8 +119,8 @@ namespace kdGfx
 			_buffer = _device->createBuffer
 			({
 				.size = size,
-				.usage = BufferUsage::CopySrc,
-				.hostVisible = true,
+				.usage = (_hostVisible == HostVisible::Readback) ? BufferUsage::CopyDst : BufferUsage::CopySrc,
+				.hostVisible = _hostVisible,
 				.name = "Staging Buffer"
 			});
 			return true;
@@ -81,22 +128,43 @@ namespace kdGfx
 		return false;
 	}
 
-	static StagingBuffer gStagingBuffer;
+	static StagingBuffer gUploadStagingBuffer;
 
-	void StagingBuffer::initGlobal(BackendType backend, const std::shared_ptr<Device>& device)
+	void StagingBuffer::initUploadGlobal(BackendType backend, const std::shared_ptr<Device>& device)
 	{
-		gStagingBuffer._backend = backend;
-		gStagingBuffer._device = device;
+		gUploadStagingBuffer._hostVisible = HostVisible::Upload;
+		gUploadStagingBuffer._backend = backend;
+		gUploadStagingBuffer._device = device;
 	}
 
-	void StagingBuffer::destroyGlobal()
+	void StagingBuffer::destroyUploadGlobal()
 	{
-		gStagingBuffer._buffer.reset();
-		gStagingBuffer._device.reset();
+		gUploadStagingBuffer._buffer.reset();
+		gUploadStagingBuffer._device.reset();
 	}
 
-	StagingBuffer& StagingBuffer::getGlobal()
+	StagingBuffer& StagingBuffer::getUploadGlobal()
 	{
-		return gStagingBuffer;
+		return gUploadStagingBuffer;
+	}
+
+	static StagingBuffer gReadbackStagingBuffer;
+
+	void StagingBuffer::initReadbackGlobal(BackendType backend, const std::shared_ptr<Device>& device)
+	{
+		gReadbackStagingBuffer._hostVisible = HostVisible::Readback;
+		gReadbackStagingBuffer._backend = backend;
+		gReadbackStagingBuffer._device = device;
+	}
+
+	void StagingBuffer::destroyReadbackGlobal()
+	{
+		gReadbackStagingBuffer._buffer.reset();
+		gReadbackStagingBuffer._device.reset();
+	}
+
+	StagingBuffer& StagingBuffer::getReadbackGlobal()
+	{
+		return gReadbackStagingBuffer;
 	}
 }

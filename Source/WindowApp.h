@@ -39,6 +39,7 @@ namespace kdGfx
         uint32_t height = 600;
         std::string title;
         Format format = Format::Undefined;
+        TextureUsage usage = TextureUsage::ColorAttachment;
         bool vsync = false;
 
         void parseArgs(int argc, char* argv[])
@@ -70,6 +71,7 @@ namespace kdGfx
         bool init(const WindowAppDesc& desc);
         void mainLoop();
         // 窗口函数
+		void setWindowSize(uint32_t width, uint32_t height);
         glm::vec2 getCursorPos();
         bool mouseButtonPress(int button = 0);
         bool mouseButtonRelease(int button = 0);
@@ -119,7 +121,7 @@ namespace kdGfx
         std::vector<std::shared_ptr<TextureView>> _backBufferViews;
         
     private:
-        uint64_t _fenceValue = 0;
+        uint64_t _fenceValue = 1;
         std::shared_ptr<Fence> _fence;
         std::shared_ptr<CommandList> _commandList;
         uint32_t _lastWidth = 0;
