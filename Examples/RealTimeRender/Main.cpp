@@ -370,7 +370,7 @@ public:
 		({
 			.size = sizeof(Param),
 			.usage = BufferUsage::Constant,
-			.hostVisible = true,
+			.hostVisible = HostVisible::Upload,
 			.name = "GBufferParam"
 		});
 

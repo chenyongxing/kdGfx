@@ -218,7 +218,7 @@ public:
 		({
 			.size = sizeof(Param),
 			.usage = BufferUsage::Constant,
-			.hostVisible = true,
+			.hostVisible = HostVisible::Upload,
 			.name = "param"
 		});
 		std::tie(windowTexture, windowTextureView) = createTextureFormImage("window.png");
@@ -237,7 +237,7 @@ public:
 		({
 			.size = verticesSize * sizeof(Vertex),
 			.usage = BufferUsage::Vertex,
-			.hostVisible = true,
+			.hostVisible = HostVisible::Upload,
 			.name = "vertex"
 		});
 		indicesSize = subdivCount * subdivCount2 * 6;
@@ -245,7 +245,7 @@ public:
 		({
 			.size = indicesSize * sizeof(uint16_t),
 			.usage = BufferUsage::Index,
-			.hostVisible = true,
+			.hostVisible = HostVisible::Upload,
 			.name = "vertex"
 		});
 
@@ -461,39 +461,30 @@ public:
 
 	void process()
 	{
-		const float first_anim_dura = 0.3f;
-		if (progress <= first_anim_dura)
+		const float firstAnimDura = 0.3f;
+		const float secondAnimStart = 0.1f;
+		if (progress <= firstAnimDura)
 		{
-			// 第一段动画。矩形形变到曲线轨迹动画第零帧
-			float progress = this->progress / first_anim_dura;
-			calculateVertexCurvePosition(0.f);
+			// 第一段形变动画。矩形形变到曲线轨迹动画第N帧
+			float progress = this->progress / firstAnimDura;
+			calculateVertexCurvePosition(secondAnimStart);
 
-			if (direction == 0 || direction == 1)
+			for (Quad& quad : windowSubQuads)
 			{
-				for (Quad& quad : windowSubQuads)
+				for (uint32_t j = 0; j < 4; j++)
 				{
-					for (uint32_t j = 0; j < 4; j++)
-					{
-						Vertex& vtx = quad[j];
-						vtx.x = lerp(window.x + vtx.u * window.width, vtx.x, progress);
-					}
-				}
-			}
-			else if (direction == 2 || direction == 3)
-			{
-				for (Quad& quad : windowSubQuads)
-				{
-					for (uint32_t j = 0; j < 4; j++)
-					{
-						Vertex& vtx = quad[j];
-						vtx.y = lerp(window.y + vtx.v * window.height, vtx.y, progress);
-					}
+					Vertex& vtx = quad[j];
+					vtx.x = lerp(window.x + vtx.u * window.width, vtx.x, progress);
+					vtx.y = lerp(window.y + vtx.v * window.height, vtx.y, progress);
 				}
 			}
 		}
 		else
 		{
-			float progress = (this->progress - first_anim_dura) / (1.f - first_anim_dura);
+			// 第二段轨迹动画
+			float progress = (this->progress - firstAnimDura) / (1.f - firstAnimDura);
+			// 0~1 -> secondAnimStart~1
+			progress = lerp(secondAnimStart, 1.f, progress);
 			calculateVertexCurvePosition(progress);
 		}
 	}

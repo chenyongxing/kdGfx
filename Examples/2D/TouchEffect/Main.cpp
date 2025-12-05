@@ -240,13 +240,13 @@ public:
 		({
 			.size = 1024 * 1024,
 			.usage = BufferUsage::Vertex,
-			.hostVisible = true
+			.hostVisible = HostVisible::Upload
 		});
 		circleVerticesBuffer = _device->createBuffer
 		({
 			.size = sizeof(float) * 2 * 6,
 			.usage = BufferUsage::Vertex,
-			.hostVisible = true
+			.hostVisible = HostVisible::Upload
 		});
 
 		// animate

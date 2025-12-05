@@ -8,178 +8,8 @@ struct Param
 {
 	glm::vec2 iResolution;
 	glm::vec2 texelSize;
+	glm::vec4 texUVClamp;
 	float offset = 2.0f;
-};
-
-class BlurSubregionPass final
-{
-public:
-	WindowApp* windowApp = nullptr;
-	std::shared_ptr<Device> device;
-	std::shared_ptr<BindSetLayout> tex1BindSetLayout;
-	std::shared_ptr<Pipeline> imagePipeline;
-	std::shared_ptr<Pipeline> dualKawaseBlurDownPipeline;
-	std::shared_ptr<Pipeline> dualKawaseBlurUpPipeline;
-	std::shared_ptr<Sampler> linerClampSampler;
-	std::shared_ptr<Sampler> linerRepeatSampler;
-
-	std::shared_ptr<Texture> image;
-	std::shared_ptr<TextureView> imageView;
-	Format imageFormat = Format::Undefined;
-	glm::ivec4 imageRegion{ 0 };
-
-	int iteration = 2;
-	float offset = 2.0f;
-
-	bool dirty = true;
-
-private:
-	// 模糊中间过程贴图
-	struct BlurIterTexture
-	{
-		std::shared_ptr<Texture> texture;
-		std::shared_ptr<TextureView> textureView;
-		std::shared_ptr<BindSet> bindSet;
-	};
-	std::vector<BlurIterTexture> blurIterTextures;
-
-	// 用来画最终模糊结果图
-	std::shared_ptr<BindSet> bluredImageBindSet;
-
-	void reset()
-	{
-		blurIterTextures.clear();
-
-		// 比迭代次数多一张。第一张原始大小图用来从复制被模糊原图，同时是最后模糊结果
-		for (int i = 0; i < iteration + 1; i++)
-		{
-			auto texture = device->createTexture
-			({
-				.usage = TextureUsage::ColorAttachment | TextureUsage::Sampled |
-					(i == 0 ? TextureUsage::CopyDst : TextureUsage::Undefined),
-				.format = imageFormat,
-				.width = imageRegion.z / (uint32_t)pow(2, i),
-				.height = imageRegion.w / (uint32_t)pow(2, i),
-				.name = fmt::format("blurTexture{}", i)
-				});
-			windowApp->transitionTextureState(texture, TextureState::ShaderRead);
-			auto textureView = texture->createView({});
-
-			auto bindSet = device->createBindSet(tex1BindSetLayout);
-			bindSet->bindSampler(0, linerClampSampler);
-			bindSet->bindTexture(1, textureView);
-			blurIterTextures.push_back({ texture, textureView, bindSet });
-		}
-
-		bluredImageBindSet->bindSampler(0, linerRepeatSampler);
-		bluredImageBindSet->bindTexture(1, blurIterTextures[0].textureView);
-	}
-
-public:
-	void onSetup()
-	{
-		bluredImageBindSet = device->createBindSet(tex1BindSetLayout);
-	}
-
-	void setRegion(glm::ivec4 region)
-	{
-		if (this->imageRegion == region)	return;
-
-		this->imageRegion = region;
-		dirty = true;
-	}
-
-	void setIteration(int iteration)
-	{
-		if (this->iteration == iteration)	return;
-
-		this->iteration = iteration;
-		dirty = true;
-	}
-
-	void onRender(const std::shared_ptr<CommandList>& commandList)
-	{
-		if (dirty)
-		{
-			reset();
-			dirty = false;
-		}
-
-		Param param;
-		param.offset = offset;
-
-		//Copy background subregion
-		commandList->beginLabel("Copy background subregion");
-		commandList->resourceBarrier({ image, TextureState::ColorAttachment, TextureState::CopySrc });
-		commandList->resourceBarrier({ blurIterTextures[0].texture, TextureState::ShaderRead, TextureState::CopyDst });
-		commandList->copyTexture(image, blurIterTextures[0].texture, 
-			{ imageRegion.z, imageRegion.w }, { imageRegion.x, imageRegion.y }, { 0, 0 });
-		commandList->resourceBarrier({ blurIterTextures[0].texture, TextureState::CopyDst, TextureState::ShaderRead });
-		commandList->resourceBarrier({ image, TextureState::CopySrc, TextureState::ColorAttachment });
-		commandList->endLabel();
-
-		//Downsample
-		for (int i = 0; i < iteration; i++)
-		{
-			auto& renderTarget = blurIterTextures[i + 1];
-			auto& drawTexture = blurIterTextures[i];
-			uint32_t width = renderTarget.texture->getWidth();
-			uint32_t height = renderTarget.texture->getHeight();
-
-			param.iResolution = { width, height };
-			param.texelSize = { 1.0f / param.iResolution.x, 1.0f / param.iResolution.y };
-
-			commandList->beginLabel(fmt::format("Downsample {}", i));
-			commandList->resourceBarrier({ renderTarget.texture, renderTarget.texture->getState(), TextureState::ColorAttachment });
-			commandList->resourceBarrier({ drawTexture.texture, drawTexture.texture->getState(), TextureState::ShaderRead });
-			commandList->beginRenderPass({ {{.textureView = renderTarget.textureView }} });
-			commandList->setPipeline(dualKawaseBlurDownPipeline);
-			commandList->setPushConstant(&param);
-			commandList->setBindSet(0, drawTexture.bindSet);
-			commandList->setViewport(0, 0, width, height);
-			commandList->setScissor(0, 0, width, height);
-			commandList->draw(3);
-			commandList->endRenderPass();
-			commandList->endLabel();
-		}
-
-		//Upsample
-		for (int i = iteration; i > 0; i--)
-		{
-			auto& renderTarget = blurIterTextures[i - 1];
-			auto& drawTexture = blurIterTextures[i];
-			uint32_t width = renderTarget.texture->getWidth();
-			uint32_t height = renderTarget.texture->getHeight();
-
-			param.iResolution = { width, height };
-			param.texelSize = { 1.0f / param.iResolution.x, 1.0f / param.iResolution.y };
-
-			commandList->beginLabel(fmt::format("Upsample {}", i));
-			commandList->resourceBarrier({ renderTarget.texture, renderTarget.texture->getState(), TextureState::ColorAttachment });
-			commandList->resourceBarrier({ drawTexture.texture, drawTexture.texture->getState(), TextureState::ShaderRead });
-			commandList->beginRenderPass({ {{.textureView = renderTarget.textureView }} });
-			commandList->setPipeline(dualKawaseBlurUpPipeline);
-			commandList->setPushConstant(&param);
-			commandList->setBindSet(0, drawTexture.bindSet);
-			commandList->setViewport(0, 0, width, height);
-			commandList->setScissor(0, 0, width, height);
-			commandList->draw(3);
-			commandList->endRenderPass();
-			commandList->endLabel();
-		}
-
-		//Draw blured image
-		commandList->beginLabel("Draw blured image");
-		commandList->resourceBarrier({ blurIterTextures[0].texture, blurIterTextures[0].texture->getState(), TextureState::ShaderRead });
-		commandList->beginRenderPass({ {{.textureView = imageView }} });
-		commandList->setPipeline(imagePipeline);
-		commandList->setBindSet(0, bluredImageBindSet);
-		commandList->setViewport(imageRegion.x, imageRegion.y, imageRegion.z, imageRegion.w);
-		commandList->setScissor(imageRegion.x, imageRegion.y, imageRegion.z, imageRegion.w);
-		commandList->draw(3);
-		commandList->endRenderPass();
-		commandList->endLabel();
-	}
 };
 
 class MainWindow : public WindowApp
@@ -196,16 +26,71 @@ public:
 	std::shared_ptr<Texture> backgroundTexture;
 	std::shared_ptr<TextureView> backgroundTextureView;
 
-	int iteration = 2;
+	int iteration = 4;
 	float offset = 2.0f;
 
-	glm::ivec4 subregion0{ 100, 100, 800, 600 };
-	std::shared_ptr<BlurSubregionPass> blurSubregionPass0;
+	// 从原图提取的子区域进行模糊
+	glm::ivec4 subregion = { 201, 101, 401, 301 };
 
-	glm::ivec4 subregion1{ 200, 200, 200, 150 };
-	std::shared_ptr<BlurSubregionPass> blurSubregionPass1;
+	// 模糊中间过程贴图
+	struct BlurIterCacheItem
+	{
+		std::shared_ptr<Buffer> vertexBuffer;
+		std::shared_ptr<Texture> texture;
+		std::shared_ptr<TextureView> textureView;
+		std::shared_ptr<BindSet> bindSet;
+	};
+	std::vector<BlurIterCacheItem> blurIterCache;
+	bool blurIterCacheDirty = true;
 
-	bool drawSubregion1 = true;
+	void recreateCacheTextures()
+	{
+		if (!blurIterCacheDirty)	return;
+		blurIterCacheDirty = false;
+
+		blurIterCache.clear();
+
+		size_t vertexBufferSize = sizeof(float) * 2 * 6;
+
+		// 渲染时候更新第0张贴图为后备缓冲区
+		blurIterCache.push_back({
+			.vertexBuffer = _device->createBuffer
+			({
+				.size = vertexBufferSize,
+				.usage = BufferUsage::Vertex,
+				.hostVisible = HostVisible::Upload,
+				.name = "vertexBuffer0"
+			}),
+			.bindSet = _device->createBindSet(tex1BindSetLayout)
+		});
+
+		for (uint32_t i = 1; i < iteration + 1; i++)
+		{
+			auto vertexBuffer = _device->createBuffer
+			({
+				.size = vertexBufferSize,
+				.usage = BufferUsage::Vertex,
+				.hostVisible = HostVisible::Upload,
+				.name = fmt::format("vertexBuffer{}", i)
+			});
+
+			auto texture = _device->createTexture
+			({
+				.usage = TextureUsage::ColorAttachment | TextureUsage::Sampled | TextureUsage::CopyDst,
+				.format = _swapchain->getFormat(),
+				.width = getWidth() / (uint32_t)pow(2, i),
+				.height = getHeight() / (uint32_t)pow(2, i),
+				.name = fmt::format("blurTexture{}", i)
+			});
+			transitionTextureState(texture, TextureState::ShaderRead);
+			auto textureView = texture->createView({});
+
+			auto bindSet = _device->createBindSet(tex1BindSetLayout);
+			bindSet->bindSampler(0, _nearestClampSampler);
+			bindSet->bindTexture(1, textureView);
+			blurIterCache.push_back({ vertexBuffer, texture, textureView, bindSet });
+		}
+	}
 
 	void onSetup() override
 	{
@@ -236,6 +121,7 @@ public:
 				.pixel = psShader,
 				.pushConstantLayout = { sizeof(Param), 0, 0 },
 				.bindSetLayouts = { tex1BindSetLayout },
+				.vertexAttributes ={{ .location = 0, .semantic = "POSITION", .format = Format::RG32Sfloat }},
 				.colorFormats = { _swapchain->getFormat() }
 			});
 		}
@@ -249,6 +135,7 @@ public:
 				.pixel = psShader,
 				.pushConstantLayout = { sizeof(Param), 0, 0 },
 				.bindSetLayouts = { tex1BindSetLayout },
+				.vertexAttributes = {{.location = 0, .semantic = "POSITION", .format = Format::RG32Sfloat }},
 				.colorFormats = { _swapchain->getFormat() }
 			});
 		}
@@ -260,44 +147,45 @@ public:
 		backgroundBindSet = _device->createBindSet(tex1BindSetLayout);
 		backgroundBindSet->bindSampler(0, _linerRepeatSampler);
 		backgroundBindSet->bindTexture(1, backgroundTextureView);
-
-
-		blurSubregionPass0 = std::make_shared<BlurSubregionPass>();
-		blurSubregionPass0->windowApp = this;
-		blurSubregionPass0->device = _device;
-		blurSubregionPass0->tex1BindSetLayout = tex1BindSetLayout;
-		blurSubregionPass0->imagePipeline = imagePipeline;
-		blurSubregionPass0->dualKawaseBlurDownPipeline = dualKawaseBlurDownPipeline;
-		blurSubregionPass0->dualKawaseBlurUpPipeline = dualKawaseBlurUpPipeline;
-		blurSubregionPass0->linerClampSampler = _linerClampSampler;
-		blurSubregionPass0->linerRepeatSampler = _linerRepeatSampler;
-		blurSubregionPass0->onSetup();
-
-		blurSubregionPass1 = std::make_shared<BlurSubregionPass>();
-		blurSubregionPass1->windowApp = this;
-		blurSubregionPass1->device = _device;
-		blurSubregionPass1->tex1BindSetLayout = tex1BindSetLayout;
-		blurSubregionPass1->imagePipeline = imagePipeline;
-		blurSubregionPass1->dualKawaseBlurDownPipeline = dualKawaseBlurDownPipeline;
-		blurSubregionPass1->dualKawaseBlurUpPipeline = dualKawaseBlurUpPipeline;
-		blurSubregionPass1->linerClampSampler = _linerClampSampler;
-		blurSubregionPass1->linerRepeatSampler = _linerRepeatSampler;
-		blurSubregionPass1->onSetup();
 	}
 
 	void onImGui() override
 	{
-		ImGui::DragInt4("subRegion0", glm::value_ptr(subregion0));
-		ImGui::DragInt4("subRegion1", glm::value_ptr(subregion1));
-		ImGui::Checkbox("subRegion1 blur", &drawSubregion1);
+		ImGui::DragInt4("Sub Region", glm::value_ptr(subregion));
 		ImGui::Separator();
-		ImGui::InputInt("Iteration", &iteration);
+		if (ImGui::InputInt("Iteration", &iteration)) {
+			blurIterCacheDirty = true;
+		}
 		iteration = glm::clamp(iteration, 1, 10);
 		ImGui::DragFloat("Offset", &offset, 0.1f, 0.f, 100.f);
+
+		recreateCacheTextures();
 	}
 
 	void onRender(const std::shared_ptr<CommandList>& commandList) override
 	{
+		// vertices upload gpu
+		for (int i = 0; i < iteration + 1; i++)
+		{
+			int32_t iterScale = pow(2, i);
+
+			auto& renderTarget = blurIterCache[i];
+			glm::vec2* pos = (glm::vec2*)renderTarget.vertexBuffer->map();
+
+			glm::ivec4 subregionIter;
+			subregionIter.x = subregion.x / iterScale;
+			subregionIter.y = subregion.y / iterScale;
+			subregionIter.z = subregion.z / iterScale;
+			subregionIter.w = subregion.w / iterScale;
+
+			pos[0] = glm::vec2(subregionIter.x, subregionIter.y);
+			pos[1] = glm::vec2(subregionIter.x + subregionIter.z, subregionIter.y);
+			pos[2] = glm::vec2(subregionIter.x + subregionIter.z, subregionIter.y + subregionIter.w);
+			pos[3] = glm::vec2(subregionIter.x, subregionIter.y);
+			pos[4] = glm::vec2(subregionIter.x + subregionIter.z, subregionIter.y + subregionIter.w);
+			pos[5] = glm::vec2(subregionIter.x, subregionIter.y + subregionIter.w);
+		}
+
 		auto [backBuffer, backBufferView] = getBackBuffer(_frameIndex);
 		
 		// Draw background
@@ -316,34 +204,102 @@ public:
 		commandList->endRenderPass();
 		commandList->endLabel();
 
-		// draw blured image
-		blurSubregionPass0->image = backBuffer;
-		blurSubregionPass0->imageView = backBufferView;
-		blurSubregionPass0->imageFormat = _swapchain->getFormat();
-		blurSubregionPass0->offset = offset;
-		blurSubregionPass0->setRegion(subregion0);
-		blurSubregionPass0->setIteration(iteration);
-		blurSubregionPass0->onRender(commandList);
+		// Blur
+		blurIterCache[0].texture = backBuffer;
+		blurIterCache[0].textureView = backBufferView;
+		blurIterCache[0].bindSet->bindSampler(0, _nearestClampSampler);
+		blurIterCache[0].bindSet->bindTexture(1, backBufferView);
 
-		// clear subregion1 to image
-		commandList->beginRenderPass({ {{.textureView = backBufferView }} });
-		commandList->setPipeline(imagePipeline);
-		commandList->setBindSet(0, backgroundBindSet);
-		commandList->setViewport(0, 0, backgroundWidth, backgroundHeight);
-		commandList->setScissor(subregion1.x, subregion1.y, subregion1.z, subregion1.w);
-		commandList->draw(3);
-		commandList->endRenderPass();
-
-		// draw subregion1 blured image
-		if (drawSubregion1)
+		// Blur Downsample
+		for (int i = 0; i < iteration; i++)
 		{
-			blurSubregionPass1->image = backBuffer;
-			blurSubregionPass1->imageView = backBufferView;
-			blurSubregionPass1->imageFormat = _swapchain->getFormat();
-			blurSubregionPass1->offset = offset;
-			blurSubregionPass1->setRegion(subregion1);
-			blurSubregionPass1->setIteration(iteration);
-			blurSubregionPass1->onRender(commandList);
+			auto& renderTarget = blurIterCache[i + 1];
+			auto& drawTexture = blurIterCache[i];
+			uint32_t width = renderTarget.texture->getWidth();
+			uint32_t height = renderTarget.texture->getHeight();
+
+			Param param;
+			param.offset = offset;
+			param.iResolution = { width, height };
+			param.texelSize = { 0.5f / param.iResolution.x, 0.5f / param.iResolution.y };
+			{
+				float width = drawTexture.texture->getWidth();
+				float height = drawTexture.texture->getHeight();
+
+				float iterScale = pow(2, i);
+				glm::ivec4 subregionIter;
+				subregionIter.x = subregion.x / iterScale;
+				subregionIter.y = subregion.y / iterScale;
+				subregionIter.z = subregion.z / iterScale;
+				subregionIter.w = subregion.w / iterScale;
+				param.texUVClamp =
+				{
+					subregionIter.x / width,
+					subregionIter.y / height,
+					(subregionIter.x + subregionIter.z) / width,
+					(subregionIter.y + subregionIter.w) / height
+				};
+			}
+
+			commandList->beginLabel(fmt::format("Downsample {}", i));
+			commandList->resourceBarrier({ renderTarget.texture, renderTarget.texture->getState(), TextureState::ColorAttachment });
+			commandList->resourceBarrier({ drawTexture.texture, drawTexture.texture->getState(), TextureState::ShaderRead });
+			commandList->beginRenderPass({ {{.textureView = renderTarget.textureView }} });
+			commandList->setPipeline(dualKawaseBlurDownPipeline);
+			commandList->setPushConstant(&param);
+			commandList->setBindSet(0, drawTexture.bindSet);
+			commandList->setVertexBuffer(0, renderTarget.vertexBuffer);
+			commandList->setViewport(0, 0, width, height);
+			commandList->setScissor(0, 0, width, height);
+			commandList->draw(6);
+			commandList->endRenderPass();
+			commandList->endLabel();
+		}
+
+		// Blur Upsample
+		for (int i = iteration; i > 0; i--)
+		{
+			auto& renderTarget = blurIterCache[i - 1];
+			auto& drawTexture = blurIterCache[i];
+			uint32_t width = renderTarget.texture->getWidth();
+			uint32_t height = renderTarget.texture->getHeight();
+
+			Param param;
+			param.offset = offset;
+			param.iResolution = { width, height };
+			param.texelSize = { 0.5f / param.iResolution.x, 0.5f / param.iResolution.y };
+			{
+				float width = drawTexture.texture->getWidth();
+				float height = drawTexture.texture->getHeight();
+
+				float iterScale = pow(2, i);
+				glm::ivec4 subregionIter;
+				subregionIter.x = subregion.x / iterScale;
+				subregionIter.y = subregion.y / iterScale;
+				subregionIter.z = subregion.z / iterScale;
+				subregionIter.w = subregion.w / iterScale;
+				param.texUVClamp =
+				{
+					subregionIter.x / width,
+					subregionIter.y / height,
+					(subregionIter.x + subregionIter.z) / width,
+					(subregionIter.y + subregionIter.w) / height
+				};
+			}
+
+			commandList->beginLabel(fmt::format("Upsample {}", i - 1));
+			commandList->resourceBarrier({ renderTarget.texture, renderTarget.texture->getState(), TextureState::ColorAttachment });
+			commandList->resourceBarrier({ drawTexture.texture, drawTexture.texture->getState(), TextureState::ShaderRead });
+			commandList->beginRenderPass({ {{.textureView = renderTarget.textureView }} });
+			commandList->setPipeline(dualKawaseBlurUpPipeline);
+			commandList->setPushConstant(&param);
+			commandList->setBindSet(0, drawTexture.bindSet);
+			commandList->setVertexBuffer(0, renderTarget.vertexBuffer);
+			commandList->setViewport(0, 0, width, height);
+			commandList->setScissor(0, 0, width, height);
+			commandList->draw(6);
+			commandList->endRenderPass();
+			commandList->endLabel();
 		}
 	}
 };
@@ -361,7 +317,8 @@ int main(int argc, char* argv[])
 		.debug = true,
 #endif
 		.width = 1280,
-		.height = 720
+		.height = 720,
+		.usage = TextureUsage::ColorAttachment | TextureUsage::Sampled,
 	};
 	windowDesc.parseArgs(argc, argv);
 

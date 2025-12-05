@@ -1,24 +1,8 @@
-struct Vert2Pixel
-{
-    float4 position : SV_Position;
-    float2 uv : TEXCOORD;
-};
-
-[shader("vertex")]
-Vert2Pixel vertexMain(uint vertexID: SV_VertexID)
-{
-    float2 uv = float2((vertexID << 1) & 2, vertexID & 2);
-
-    Vert2Pixel output;
-    output.uv = float2(uv.x, 1.0 - uv.y);
-    output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
-    return output;
-}
-
 struct PushConstant
 {
     float2 iResolution;
     float2 texelSize;
+    float4 texUVClamp;
     float offset;
 };
 
@@ -26,19 +10,44 @@ struct PushConstant
 [[vk::binding(1, 0)]] Texture2D mainTexture : register(t0, space0);
 [[vk::push_constant]] ConstantBuffer<PushConstant> Param : register(b0, space0);
 
+struct VertInput
+{
+    [[vk::location(0)]] float2 position : POSITION;
+};
+
+struct Vert2Pixel
+{
+    float4 position : SV_Position;
+    float2 uv : TEXCOORD;
+};
+
+[shader("vertex")]
+Vert2Pixel vertexMain(VertInput input)
+{
+    float2 uv = input.position / Param.iResolution;
+
+    Vert2Pixel output;
+    output.uv = uv;
+    output.position = float4(uv * 2.0 - 1.0, 0.0, 1.0);
+    output.position.y = -output.position.y;
+    return output;
+}
+
+#include "sampler.hlsli"
+
 [shader("pixel")]
 float4 pixelMain(Vert2Pixel input) : SV_Target
 {
     float2 uv = input.uv;
 
-    float4 color = mainTexture.Sample(mainSampler, uv + float2(-Param.texelSize.x * 2.0, 0.0) * Param.offset);
-    color += mainTexture.Sample(mainSampler, uv + float2(-Param.texelSize.x, Param.texelSize.y) * Param.offset) * 2.0;
-    color += mainTexture.Sample(mainSampler, uv + float2(0.0, Param.texelSize.y * 2.0) * Param.offset);
-    color += mainTexture.Sample(mainSampler, uv + float2(Param.texelSize.x, Param.texelSize.y) * Param.offset) * 2.0;
-    color += mainTexture.Sample(mainSampler, uv + float2(Param.texelSize.x * 2.0, 0.0) * Param.offset);
-    color += mainTexture.Sample(mainSampler, uv + float2(Param.texelSize.x, -Param.texelSize.y) * Param.offset) * 2.0;
-    color += mainTexture.Sample(mainSampler, uv + float2(0.0, -Param.texelSize.y * 2.0) * Param.offset);
-    color += mainTexture.Sample(mainSampler, uv + float2(-Param.texelSize.x, -Param.texelSize.y) * Param.offset) * 2.0;
+    float4 color = linearSample(mainTexture, uv + float2(-Param.texelSize.x * 2.0, 0.0) * Param.offset);
+    color += linearSample(mainTexture, uv + float2(-Param.texelSize.x, Param.texelSize.y) * Param.offset) * 2.0;
+    color += linearSample(mainTexture, uv + float2(0.0, Param.texelSize.y * 2.0) * Param.offset);
+    color += linearSample(mainTexture, uv + float2(Param.texelSize.x, Param.texelSize.y) * Param.offset) * 2.0;
+    color += linearSample(mainTexture, uv + float2(Param.texelSize.x * 2.0, 0.0) * Param.offset);
+    color += linearSample(mainTexture, uv + float2(Param.texelSize.x, -Param.texelSize.y) * Param.offset) * 2.0;
+    color += linearSample(mainTexture, uv + float2(0.0, -Param.texelSize.y * 2.0) * Param.offset);
+    color += linearSample(mainTexture, uv + float2(-Param.texelSize.x, -Param.texelSize.y) * Param.offset) * 2.0;
 
     return color / 12.0;
 }
